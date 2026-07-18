@@ -1,4 +1,4 @@
-# Escáner de red HTTP - Puerto 80
+# Escaner de red HTTP - Puerto 80
 # Busca en el rango de IPs desde .2 hasta .253
 # OMITE RESPUESTAS HTTP 500
 # SOLO MUESTRA EN PANTALLA - NO GENERA ARCHIVOS
@@ -18,20 +18,20 @@ param(
 
 # Validar formato del segmento
 if ($SegmentoIncompleto -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}$') {
-    Write-Host "Error: Formato de IP inválido. Use formato: 192.168.1" -ForegroundColor Red
+    Write-Host "Error: Formato de IP invalido. Use formato: 192.168.1" -ForegroundColor Red
     Write-Host "Ejemplo: .\Scan-Http.ps1 -SegmentoIncompleto 192.168.1" -ForegroundColor Yellow
     exit 1
 }
 
 Write-Host "====================================" -ForegroundColor Cyan
-Write-Host "ESCÁNER HTTP - PUERTO 80" -ForegroundColor Cyan
+Write-Host "ESCANER HTTP - PUERTO 80" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "Segmento base: $SegmentoIncompleto.x" -ForegroundColor Yellow
 Write-Host "Rango: .2 a .253" -ForegroundColor Yellow
 Write-Host "Puerto: $Puerto" -ForegroundColor Yellow
 Write-Host "Timeout: $TimeoutMilisegundos ms" -ForegroundColor Yellow
 Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
-Write-Host "SOLO VISUALIZACIÓN EN PANTALLA" -ForegroundColor Cyan
+Write-Host "SOLO VISUALIZACION EN PANTALLA" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -44,7 +44,7 @@ $IPsConError = 0
 # Lista de IPs encontradas para mostrar al final
 $Encontradas = @()
 
-# Crear un objeto para medición de tiempo
+# Crear un objeto para medicion de tiempo
 $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # Bucle para escanear todas las IPs del rango
@@ -57,7 +57,7 @@ for ($i = 2; $i -le 253; $i++) {
     Write-Progress -Activity "Escaneando red" -Status "IP: $IPCompleta" -PercentComplete $Progreso
     
     try {
-        # Intentar conexión TCP al puerto 80
+        # Intentar conexion TCP al puerto 80
         $TcpClient = New-Object System.Net.Sockets.TcpClient
         $AsyncResult = $TcpClient.BeginConnect($IPCompleta, $Puerto, $null, $null)
         $WaitHandle = $AsyncResult.AsyncWaitHandle
@@ -67,10 +67,10 @@ for ($i = 2; $i -le 253; $i++) {
             try {
                 $TcpClient.EndConnect($AsyncResult)
                 
-                # Conexión exitosa, intentar obtener respuesta HTTP
+                # Conexion exitosa, intentar obtener respuesta HTTP
                 $NetworkStream = $TcpClient.GetStream()
                 
-                # Enviar solicitud HTTP GET básica
+                # Enviar solicitud HTTP GET basica
                 $Request = "GET / HTTP/1.0`r`nHost: $IPCompleta`r`nConnection: close`r`n`r`n"
                 $Bytes = [System.Text.Encoding]::ASCII.GetBytes($Request)
                 $NetworkStream.Write($Bytes, 0, $Bytes.Length)
@@ -83,7 +83,7 @@ for ($i = 2; $i -le 253; $i++) {
                 if ($BytesRead -gt 0) {
                     $Respuesta = [System.Text.Encoding]::ASCII.GetString($Buffer, 0, $BytesRead)
                     
-                    # Extraer código de estado HTTP
+                    # Extraer codigo de estado HTTP
                     if ($Respuesta -match 'HTTP/\d\.\d\s+(\d{3})') {
                         $StatusCode = $Matches[1]
                         
@@ -111,7 +111,7 @@ for ($i = 2; $i -le 253; $i++) {
                     $IPsConRespuesta++
                     $Encontradas += [PSCustomObject]@{ IP = $IPCompleta; Codigo = $StatusCode; Server = $Server }
 
-                    # Mostrar en pantalla con colores según el código de estado
+                    # Mostrar en pantalla con colores segun el codigo de estado
                     switch -wildcard ($StatusCode) {
                         "2*" { $Color = "Green" }
                         "3*" { $Color = "Yellow" }
@@ -123,7 +123,7 @@ for ($i = 2; $i -le 253; $i++) {
                     Write-Host " ($Server)" -ForegroundColor Gray
                     
                 } else {
-                    # Conexión pero sin respuesta HTTP
+                    # Conexion pero sin respuesta HTTP
                     Write-Host "[INFO] $IPCompleta -> Conecta pero no responde HTTP" -ForegroundColor Yellow
                 }
                 
@@ -136,7 +136,7 @@ for ($i = 2; $i -le 253; $i++) {
                 }
             }
         } else {
-            # Timeout - sin conexión
+            # Timeout - sin conexion
             if ($MostrarErrores) {
                 Write-Host "[TIMEOUT] $IPCompleta -> No responde" -ForegroundColor Gray
             }
@@ -168,7 +168,7 @@ Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
 
 if ($IPsConRespuesta -eq 0) {
-    Write-Host "No se encontraron IPs con respuesta HTTP válida (diferente de 500)." -ForegroundColor Yellow
+    Write-Host "No se encontraron IPs con respuesta HTTP valida (diferente de 500)." -ForegroundColor Yellow
 } else {
     Write-Host "IPs ENCONTRADAS:" -ForegroundColor Green
     Write-Host "====================================" -ForegroundColor Cyan
