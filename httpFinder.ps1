@@ -13,6 +13,9 @@ param(
 
     [int]$TimeoutMilisegundos = 1000,
 
+    # Cuantos objetivos se escanean a la vez (mas = mas rapido, mas carga)
+    [int]$MaxConcurrencia = 50,
+
     [switch]$MostrarErrores,
 
     [switch]$Mostrar500  # Switch para mostrar errores 500 si se desea
@@ -129,64 +132,84 @@ Write-Host "Segmento base: $SegmentoIncompleto.x" -ForegroundColor Yellow
 Write-Host "Rango: .1 a .254" -ForegroundColor Yellow
 Write-Host "Puertos: $($Puertos -join ', ')" -ForegroundColor Yellow
 Write-Host "Timeout: $TimeoutMilisegundos ms" -ForegroundColor Yellow
+Write-Host "Concurrencia: $MaxConcurrencia objetivos a la vez" -ForegroundColor Yellow
 Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
 Write-Host "SOLO VISUALIZACION EN PANTALLA" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Contadores
-$TotalTareas = 0
 $ConRespuesta = 0
 $Con500 = 0
-$ConError = 0
 
 # Lista de resultados encontrados para mostrar al final
 $Encontradas = @()
 
 $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-$TareasTotales = 254 * $Puertos.Count
+# --- Lanzar el escaneo en paralelo con un pool de runspaces ---
+$Pool = [runspacefactory]::CreateRunspacePool(1, $MaxConcurrencia)
+$Pool.Open()
 
-# Recorrer todas las IPs del rango y cada puerto
+# El bloque de escaneo se pasa como texto a cada runspace
+$CodigoScan = $ScanTarget.ToString()
+$Jobs = New-Object System.Collections.ArrayList
+
 for ($i = 1; $i -le 254; $i++) {
     $IPCompleta = "$SegmentoIncompleto.$i"
-
     foreach ($Puerto in $Puertos) {
-        $TotalTareas++
-        $Progreso = [math]::Round(($TotalTareas / $TareasTotales) * 100, 1)
-        Write-Progress -Activity "Escaneando red" -Status "Probando $IPCompleta`:$Puerto" -PercentComplete $Progreso
-
-        $R = & $ScanTarget $IPCompleta $Puerto $TimeoutMilisegundos
-        if ($null -eq $R) { continue }
-
-        # Omitir HTTP 500 salvo que se pida lo contrario
-        if ($R.Codigo -eq '500') {
-            $Con500++
-            if ($Mostrar500) {
-                Write-Host "[500 OMITIDO] $($R.IP):$($R.Puerto) -> Error HTTP 500 (ignorado)" -ForegroundColor DarkGray
-            }
-            continue
-        }
-
-        $ConRespuesta++
-        $Encontradas += $R
-
-        # Color segun el codigo
-        switch -wildcard ($R.Codigo) {
-            "2*"     { $Color = "Green" }
-            "3*"     { $Color = "Yellow" }
-            "4*"     { $Color = "Red" }
-            default  { $Color = "White" }
-        }
-
-        $Extra = @()
-        if ($R.Titulo) { $Extra += "titulo: $($R.Titulo)" }
-        if ($R.Server)  { $Extra += $R.Server } elseif ($R.Nota) { $Extra += $R.Nota }
-        $ExtraTxt = if ($Extra.Count) { " (" + ($Extra -join ' | ') + ")" } else { "" }
-        Write-Host "[OK] $($R.Esquema)://$($R.IP):$($R.Puerto) -> HTTP $($R.Codigo)" -ForegroundColor $Color -NoNewline
-        Write-Host $ExtraTxt -ForegroundColor Gray
+        $Ps = [powershell]::Create()
+        $Ps.RunspacePool = $Pool
+        $null = $Ps.AddScript($CodigoScan).AddArgument($IPCompleta).AddArgument($Puerto).AddArgument($TimeoutMilisegundos)
+        $null = $Jobs.Add([PSCustomObject]@{ Ps = $Ps; Handle = $Ps.BeginInvoke() })
     }
 }
+
+# --- Recoger resultados a medida que terminan ---
+$TareasTotales = $Jobs.Count
+$Completadas = 0
+
+foreach ($Job in $Jobs) {
+    $Salida = $Job.Ps.EndInvoke($Job.Handle)
+    $Job.Ps.Dispose()
+
+    $Completadas++
+    $Progreso = [math]::Round(($Completadas / $TareasTotales) * 100, 1)
+    Write-Progress -Activity "Escaneando red" -Status "$Completadas de $TareasTotales objetivos" -PercentComplete $Progreso
+
+    $R = $Salida | Select-Object -First 1
+    if ($null -eq $R) { continue }
+
+    # Omitir HTTP 500 salvo que se pida lo contrario
+    if ($R.Codigo -eq '500') {
+        $Con500++
+        if ($Mostrar500) {
+            Write-Host "[500 OMITIDO] $($R.IP):$($R.Puerto) -> Error HTTP 500 (ignorado)" -ForegroundColor DarkGray
+        }
+        continue
+    }
+
+    $ConRespuesta++
+    $Encontradas += $R
+
+    # Color segun el codigo
+    switch -wildcard ($R.Codigo) {
+        "2*"     { $Color = "Green" }
+        "3*"     { $Color = "Yellow" }
+        "4*"     { $Color = "Red" }
+        default  { $Color = "White" }
+    }
+
+    $Extra = @()
+    if ($R.Titulo) { $Extra += "titulo: $($R.Titulo)" }
+    if ($R.Server)  { $Extra += $R.Server } elseif ($R.Nota) { $Extra += $R.Nota }
+    $ExtraTxt = if ($Extra.Count) { " (" + ($Extra -join ' | ') + ")" } else { "" }
+    Write-Host "[OK] $($R.Esquema)://$($R.IP):$($R.Puerto) -> HTTP $($R.Codigo)" -ForegroundColor $Color -NoNewline
+    Write-Host $ExtraTxt -ForegroundColor Gray
+}
+
+$Pool.Close()
+$Pool.Dispose()
 
 $Stopwatch.Stop()
 $TiempoTotal = $Stopwatch.Elapsed
@@ -196,7 +219,7 @@ Write-Host ""
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "RESUMEN DEL ESCANEO" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
-Write-Host "Objetivos probados (IP:puerto): $TotalTareas" -ForegroundColor White
+Write-Host "Objetivos probados (IP:puerto): $TareasTotales" -ForegroundColor White
 Write-Host "Respuestas validas: $ConRespuesta" -ForegroundColor Green
 Write-Host "Error 500 (omitidos): $Con500" -ForegroundColor Magenta
 Write-Host "Tiempo total: $($TiempoTotal.TotalSeconds) segundos" -ForegroundColor White
@@ -208,7 +231,8 @@ if ($ConRespuesta -eq 0) {
 } else {
     Write-Host "DISPOSITIVOS ENCONTRADOS:" -ForegroundColor Green
     Write-Host "====================================" -ForegroundColor Cyan
-    foreach ($item in $Encontradas) {
+    $Ordenadas = $Encontradas | Sort-Object @{Expression={[int](($_.IP -split '\.')[-1])}}, Puerto
+    foreach ($item in $Ordenadas) {
         $Partes = @()
         if ($item.Titulo) { $Partes += $item.Titulo }
         if ($item.Server) { $Partes += $item.Server } elseif ($item.Nota) { $Partes += $item.Nota }
