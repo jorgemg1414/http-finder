@@ -61,7 +61,7 @@ $ScanTarget = {
                 $Tcp.Close()
                 return [PSCustomObject]@{
                     IP = $IP; Puerto = $Puerto; Esquema = $Esquema
-                    Codigo = 'ABIERTO'; Server = ''; Nota = 'Puerto TLS abierto (handshake fallo)'
+                    Codigo = 'ABIERTO'; Server = ''; Titulo = ''; Nota = 'Puerto TLS abierto (handshake fallo)'
                 }
             }
         } else {
@@ -95,7 +95,7 @@ $ScanTarget = {
         if ($Total -le 0) {
             return [PSCustomObject]@{
                 IP = $IP; Puerto = $Puerto; Esquema = $Esquema
-                Codigo = 'ABIERTO'; Server = ''; Nota = 'Conecta pero no responde HTTP'
+                Codigo = 'ABIERTO'; Server = ''; Titulo = ''; Nota = 'Conecta pero no responde HTTP'
             }
         }
 
@@ -104,9 +104,17 @@ $ScanTarget = {
         # Cabecera Server
         if ($Respuesta -match 'Server:\s*([^\r\n]+)') { $Server = $Matches[1].Trim() } else { $Server = '' }
 
+        # Titulo de la pagina: suele identificar el dispositivo (marca/modelo)
+        if ($Respuesta -match '(?is)<title[^>]*>\s*(.*?)\s*</title>') {
+            $Titulo = ($Matches[1] -replace '\s+', ' ').Trim()
+            if ($Titulo.Length -gt 60) { $Titulo = $Titulo.Substring(0, 60) + '...' }
+        } else {
+            $Titulo = ''
+        }
+
         return [PSCustomObject]@{
             IP = $IP; Puerto = $Puerto; Esquema = $Esquema
-            Codigo = $Codigo; Server = $Server; Nota = ''
+            Codigo = $Codigo; Server = $Server; Titulo = $Titulo; Nota = ''
         }
     } catch {
         try { $Tcp.Close() } catch { }
@@ -171,9 +179,12 @@ for ($i = 1; $i -le 254; $i++) {
             default  { $Color = "White" }
         }
 
-        $ServerTxt = if ($R.Server) { " ($($R.Server))" } elseif ($R.Nota) { " ($($R.Nota))" } else { "" }
-        Write-Host "[OK] $($R.IP):$($R.Puerto) -> HTTP $($R.Codigo)" -ForegroundColor $Color -NoNewline
-        Write-Host $ServerTxt -ForegroundColor Gray
+        $Extra = @()
+        if ($R.Titulo) { $Extra += "titulo: $($R.Titulo)" }
+        if ($R.Server)  { $Extra += $R.Server } elseif ($R.Nota) { $Extra += $R.Nota }
+        $ExtraTxt = if ($Extra.Count) { " (" + ($Extra -join ' | ') + ")" } else { "" }
+        Write-Host "[OK] $($R.Esquema)://$($R.IP):$($R.Puerto) -> HTTP $($R.Codigo)" -ForegroundColor $Color -NoNewline
+        Write-Host $ExtraTxt -ForegroundColor Gray
     }
 }
 
@@ -198,8 +209,11 @@ if ($ConRespuesta -eq 0) {
     Write-Host "DISPOSITIVOS ENCONTRADOS:" -ForegroundColor Green
     Write-Host "====================================" -ForegroundColor Cyan
     foreach ($item in $Encontradas) {
-        $Detalle = if ($item.Server) { $item.Server } elseif ($item.Nota) { $item.Nota } else { "-" }
-        Write-Host ("  {0}://{1}:{2}  ->  HTTP {3}  ({4})" -f $item.Esquema, $item.IP, $item.Puerto, $item.Codigo, $Detalle) -ForegroundColor White
+        $Partes = @()
+        if ($item.Titulo) { $Partes += $item.Titulo }
+        if ($item.Server) { $Partes += $item.Server } elseif ($item.Nota) { $Partes += $item.Nota }
+        $Detalle = if ($Partes.Count) { $Partes -join ' | ' } else { '-' }
+        Write-Host ("  {0}://{1}:{2}  ->  HTTP {3}  [{4}]" -f $item.Esquema, $item.IP, $item.Puerto, $item.Codigo, $Detalle) -ForegroundColor White
     }
     Write-Host "====================================" -ForegroundColor Cyan
 }
