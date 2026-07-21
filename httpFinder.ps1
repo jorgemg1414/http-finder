@@ -27,7 +27,7 @@ Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "ESCANER HTTP - PUERTO 80" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "Segmento base: $SegmentoIncompleto.x" -ForegroundColor Yellow
-Write-Host "Rango: .2 a .253" -ForegroundColor Yellow
+Write-Host "Rango: .1 a .254" -ForegroundColor Yellow
 Write-Host "Puerto: $Puerto" -ForegroundColor Yellow
 Write-Host "Timeout: $TimeoutMilisegundos ms" -ForegroundColor Yellow
 Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
@@ -48,12 +48,12 @@ $Encontradas = @()
 $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # Bucle para escanear todas las IPs del rango
-for ($i = 2; $i -le 253; $i++) {
+for ($i = 1; $i -le 254; $i++) {
     $IPCompleta = "$SegmentoIncompleto.$i"
     $TotalIPs++
     
     # Mostrar progreso
-    $Progreso = [math]::Round(($TotalIPs / 252) * 100, 1)
+    $Progreso = [math]::Round(($TotalIPs / 254) * 100, 1)
     Write-Progress -Activity "Escaneando red" -Status "IP: $IPCompleta" -PercentComplete $Progreso
     
     try {

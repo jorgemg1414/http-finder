@@ -4,7 +4,7 @@ Escáner HTTP de red local (LAN) para descubrir routers, cámaras IP, DVRs y otr
 dispositivos con interfaz web. Escrito en **PowerShell**, funciona en cualquier
 Windows sin instalar nada (usa solo componentes que ya trae el sistema).
 
-Recorre un rango de IPs (`.2` a `.253`), prueba el puerto HTTP, y al final te
+Recorre un rango de IPs (`.1` a `.254`), prueba el puerto HTTP, y al final te
 muestra una lista limpia con las IPs que respondieron, su código HTTP y el
 servidor detectado.
 
