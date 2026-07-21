@@ -42,9 +42,31 @@ $ScanTarget = {
         }
         $Tcp.EndConnect($Async)
 
-        $Stream = $Tcp.GetStream()
-        $Stream.ReadTimeout = $TimeoutMs
-        $Stream.WriteTimeout = $TimeoutMs
+        $NetStream = $Tcp.GetStream()
+        $NetStream.ReadTimeout = $TimeoutMs
+        $NetStream.WriteTimeout = $TimeoutMs
+
+        # Puertos TLS conocidos -> envolver la conexion en SSL/TLS
+        $UsarTls = ($Puerto -eq 443 -or $Puerto -eq 8443)
+        $Esquema = if ($UsarTls) { 'https' } else { 'http' }
+
+        if ($UsarTls) {
+            # Aceptar certificados autofirmados (comunes en routers/camaras/DVR)
+            $Callback = [System.Net.Security.RemoteCertificateValidationCallback]{ param($s, $c, $ch, $e) $true }
+            $Stream = New-Object System.Net.Security.SslStream($NetStream, $false, $Callback)
+            try {
+                $Stream.AuthenticateAsClient($IP)
+            } catch {
+                # Puerto TLS abierto pero el handshake fallo
+                $Tcp.Close()
+                return [PSCustomObject]@{
+                    IP = $IP; Puerto = $Puerto; Esquema = $Esquema
+                    Codigo = 'ABIERTO'; Server = ''; Nota = 'Puerto TLS abierto (handshake fallo)'
+                }
+            }
+        } else {
+            $Stream = $NetStream
+        }
 
         # Enviar peticion HTTP GET basica
         $Request = "GET / HTTP/1.0`r`nHost: $IP`r`nUser-Agent: http-finder`r`nConnection: close`r`n`r`n"
@@ -72,7 +94,7 @@ $ScanTarget = {
         # Conecta pero no habla HTTP (posible DVR/camara en puerto propietario)
         if ($Total -le 0) {
             return [PSCustomObject]@{
-                IP = $IP; Puerto = $Puerto; Esquema = 'http'
+                IP = $IP; Puerto = $Puerto; Esquema = $Esquema
                 Codigo = 'ABIERTO'; Server = ''; Nota = 'Conecta pero no responde HTTP'
             }
         }
@@ -83,7 +105,7 @@ $ScanTarget = {
         if ($Respuesta -match 'Server:\s*([^\r\n]+)') { $Server = $Matches[1].Trim() } else { $Server = '' }
 
         return [PSCustomObject]@{
-            IP = $IP; Puerto = $Puerto; Esquema = 'http'
+            IP = $IP; Puerto = $Puerto; Esquema = $Esquema
             Codigo = $Codigo; Server = $Server; Nota = ''
         }
     } catch {
