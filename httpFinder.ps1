@@ -77,22 +77,44 @@ $ScanTarget = {
         $Stream.Write($Bytes, 0, $Bytes.Length)
         $Stream.Flush()
 
-        # Leer respuesta (hasta 16 KB)
-        $Sb = New-Object System.Text.StringBuilder
+        # Leer respuesta (hasta 16 KB) guardando los BYTES crudos. Decodificar
+        # aqui como ASCII convertiria en '?' todo byte >127, destrozando los
+        # acentos del <title>, que es justo lo que identifica al dispositivo.
+        $Ms = New-Object System.IO.MemoryStream
         $Buffer = New-Object byte[] 4096
         $Total = 0
         try {
             while ($true) {
                 $Read = $Stream.Read($Buffer, 0, $Buffer.Length)
                 if ($Read -le 0) { break }
-                [void]$Sb.Append([System.Text.Encoding]::ASCII.GetString($Buffer, 0, $Read))
+                $Ms.Write($Buffer, 0, $Read)
                 $Total += $Read
                 if ($Total -ge 16384) { break }
             }
         } catch { }
         $Tcp.Close()
 
-        $Respuesta = $Sb.ToString()
+        $Crudo = $Ms.ToArray()
+        $Ms.Dispose()
+
+        # Latin-1 mapea cada byte a un caracter 1:1: nunca pierde informacion,
+        # asi que sirve para leer las cabeceras de forma segura.
+        $Respuesta = [System.Text.Encoding]::GetEncoding(28591).GetString($Crudo)
+
+        # Si el dispositivo declara su charset, redecodificar los bytes con el.
+        $Charset = ''
+        if ($Respuesta -match '(?i)Content-Type:[^\r\n]*charset\s*=\s*"?([\w.-]+)') {
+            $Charset = $Matches[1]
+        } elseif ($Respuesta -match '(?i)<meta[^>]+charset\s*=\s*"?([\w.-]+)') {
+            $Charset = $Matches[1]
+        }
+        if ($Charset) {
+            try {
+                $Respuesta = [System.Text.Encoding]::GetEncoding($Charset).GetString($Crudo)
+            } catch {
+                # Charset desconocido o invalido: nos quedamos con Latin-1
+            }
+        }
 
         # Conecta pero no habla HTTP (posible DVR/camara en puerto propietario)
         if ($Total -le 0) {
