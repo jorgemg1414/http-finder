@@ -4,9 +4,11 @@ Escáner HTTP de red local (LAN) para descubrir routers, cámaras IP, DVRs y otr
 dispositivos con interfaz web. Escrito en **PowerShell**, funciona en cualquier
 Windows sin instalar nada (usa solo componentes que ya trae el sistema).
 
-Recorre un rango de IPs (`.1` a `.254`), prueba el puerto HTTP, y al final te
-muestra una lista limpia con las IPs que respondieron, su código HTTP y el
-servidor detectado.
+Recorre un rango de IPs (`.1` a `.254`) probando varios puertos web a la vez y,
+al final, te muestra una lista limpia con lo que respondió: código HTTP, cabecera
+`Server` y el `<title>` de la página, que suele delatar la marca y el modelo del
+aparato. En los puertos 443 y 8443 habla HTTPS, aceptando los certificados
+autofirmados que llevan casi todos estos cacharros.
 
 > ⚠️ **Uso responsable:** utilízalo solo en tu propia red o en redes donde tengas
 > autorización. Escanear redes ajenas puede ser ilegal.
@@ -40,19 +42,25 @@ powershell -ExecutionPolicy Bypass -File .\httpFinder.ps1 -SegmentoIncompleto 19
 
 ## Parámetros
 
-| Parámetro              | Descripción                                         | Por defecto |
-|------------------------|-----------------------------------------------------|-------------|
-| `-SegmentoIncompleto`  | Primeros 3 octetos de la red (ej. `192.168.1`). **Obligatorio.** | —      |
-| `-Puerto`              | Puerto a escanear.                                  | `80`        |
-| `-TimeoutMilisegundos` | Tiempo de espera por IP, en milisegundos.           | `1000`      |
-| `-MostrarErrores`      | Muestra también timeouts y errores de conexión.     | (oculto)    |
-| `-Mostrar500`          | Muestra las IPs que devuelven HTTP 500.             | (omitido)   |
+| Parámetro              | Descripción                                          | Por defecto |
+|------------------------|------------------------------------------------------|-------------|
+| `-SegmentoIncompleto`  | Primeros 3 octetos de la red (ej. `192.168.1`). **Obligatorio.** | — |
+| `-Puertos`             | Lista de puertos a escanear, separados por comas.    | `80, 81, 8080, 8000, 8081, 443, 8443, 9000` |
+| `-TimeoutMilisegundos` | Tiempo de espera por objetivo (IP:puerto), en milisegundos. | `1000` |
+| `-MaxConcurrencia`     | Cuántos objetivos se prueban a la vez. Más = más rápido, más carga. | `50` |
+| `-MostrarErrores`      | Muestra también los puertos cerrados, timeouts y errores de red. | (oculto) |
+| `-Mostrar500`          | Incluye en los resultados las IPs que devuelven HTTP 500. | (omitido) |
 
-Ejemplo escaneando el puerto 8080 con timeout más corto:
+Ejemplo escaneando solo los puertos 80 y 8080, con timeout más corto y el doble
+de concurrencia:
 
 ```powershell
-.\httpFinder.ps1 -SegmentoIncompleto 192.168.0 -Puerto 8080 -TimeoutMilisegundos 500
+.\httpFinder.ps1 -SegmentoIncompleto 192.168.0 -Puertos 80,8080 -TimeoutMilisegundos 500 -MaxConcurrencia 100
 ```
+
+> `-MostrarErrores` imprime una línea **por cada puerto que no responde**. Con los
+> 8 puertos por defecto eso son unas 2.000 líneas, así que úsalo junto a
+> `-Puertos` para acotar el escaneo.
 
 ---
 
