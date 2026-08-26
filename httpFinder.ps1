@@ -1,7 +1,7 @@
 # Escaner de red HTTP - Multipuerto
 # Busca dispositivos con interfaz web (routers, camaras, DVRs) en la LAN
 # Escanea el rango .1 a .254 en varios puertos
-# OMITE RESPUESTAS HTTP 500 por defecto
+# LOS HTTP 500 SE LISTAN EN SU PROPIO APARTADO
 # SOLO MUESTRA EN PANTALLA - NO GENERA ARCHIVOS
 #
 # Creado por jorgemg1414
@@ -27,7 +27,7 @@ param(
 # ---------------------------------------------------------------------------
 # Identidad de la herramienta
 # ---------------------------------------------------------------------------
-$Version = '1.6.0'
+$Version = '1.7.0'
 $Autor   = 'jorgemg1414'
 $Repo    = 'https://github.com/jorgemg1414/http-finder'
 
@@ -186,16 +186,29 @@ $ScanTarget = {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Imprime un listado de resultados ordenado por IP y puerto
+# ---------------------------------------------------------------------------
+function Write-Listado($Items, $Color) {
+    $Ordenados = $Items | Sort-Object @{Expression={[int](($_.IP -split '\.')[-1])}}, Puerto
+    foreach ($item in $Ordenados) {
+        $Partes = @()
+        if ($item.Titulo) { $Partes += $item.Titulo }
+        if ($item.Server) { $Partes += $item.Server } elseif ($item.Nota) { $Partes += $item.Nota }
+        $Detalle = if ($Partes.Count) { $Partes -join ' | ' } else { '-' }
+        Write-Host ("  {0}://{1}:{2}  ->  HTTP {3}  [{4}]" -f $item.Esquema, $item.IP, $item.Puerto, $item.Codigo, $Detalle) -ForegroundColor $Color
+    }
+}
+
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "Segmento base: $SegmentoIncompleto.x" -ForegroundColor Yellow
 Write-Host "Rango: .1 a .254" -ForegroundColor Yellow
 Write-Host "Puertos: $($Puertos -join ', ')" -ForegroundColor Yellow
 Write-Host "Timeout: $TimeoutMilisegundos ms" -ForegroundColor Yellow
 Write-Host "Concurrencia: $MaxConcurrencia objetivos a la vez" -ForegroundColor Yellow
+Write-Host "ERRORES HTTP 500 EN APARTADO APARTE" -ForegroundColor Magenta
 if ($Mostrar500) {
-    Write-Host "MOSTRANDO ERRORES HTTP 500" -ForegroundColor Magenta
-} else {
-    Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
+    Write-Host "  (y tambien segun se encuentran)" -ForegroundColor Magenta
 }
 if ($MostrarErrores) {
     Write-Host "MOSTRANDO TIMEOUTS Y ERRORES DE CONEXION" -ForegroundColor Magenta
@@ -209,8 +222,9 @@ $ConRespuesta = 0
 $Con500 = 0
 $SinRespuesta = 0
 
-# Lista de resultados encontrados para mostrar al final
+# Listas de resultados para mostrar al final, en apartados separados
 $Encontradas = @()
+$Errores500 = @()
 
 $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -256,11 +270,15 @@ foreach ($Job in $Jobs) {
         continue
     }
 
-    # HTTP 500 se omite salvo que se pida verlo con -Mostrar500.
-    # Si se pide, sigue el flujo normal: cuenta y aparece en el listado final.
+    # Los HTTP 500 no ensucian el listado principal, pero tampoco se pierden:
+    # un 500 significa que hay algo escuchando ahi. Van a su propio apartado.
     if ($R.Codigo -eq '500') {
         $Con500++
-        if (-not $Mostrar500) { continue }
+        $Errores500 += $R
+        if ($Mostrar500) {
+            Write-Host "[500] $($R.Esquema)://$($R.IP):$($R.Puerto)" -ForegroundColor Magenta
+        }
+        continue
     }
 
     $ConRespuesta++
@@ -296,8 +314,7 @@ Write-Host "RESUMEN DEL ESCANEO" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "Objetivos probados (IP:puerto): $TareasTotales" -ForegroundColor White
 Write-Host "Respuestas validas: $ConRespuesta" -ForegroundColor Green
-$Etiqueta500 = if ($Mostrar500) { "mostrados" } else { "omitidos" }
-Write-Host "Error 500 ($Etiqueta500): $Con500" -ForegroundColor Magenta
+Write-Host "Con error HTTP 500: $Con500" -ForegroundColor Magenta
 Write-Host "Sin respuesta (cerrados/timeout): $SinRespuesta" -ForegroundColor DarkGray
 Write-Host "Tiempo total: $($TiempoTotal.TotalSeconds) segundos" -ForegroundColor White
 Write-Host "==============================================" -ForegroundColor Cyan
@@ -306,16 +323,20 @@ Write-Host ""
 if ($ConRespuesta -eq 0) {
     Write-Host "No se encontraron dispositivos con respuesta HTTP valida (diferente de 500)." -ForegroundColor Yellow
 } else {
-    Write-Host "DISPOSITIVOS ENCONTRADOS:" -ForegroundColor Green
+    Write-Host "DISPOSITIVOS ENCONTRADOS ($ConRespuesta):" -ForegroundColor Green
     Write-Host "==============================================" -ForegroundColor Cyan
-    $Ordenadas = $Encontradas | Sort-Object @{Expression={[int](($_.IP -split '\.')[-1])}}, Puerto
-    foreach ($item in $Ordenadas) {
-        $Partes = @()
-        if ($item.Titulo) { $Partes += $item.Titulo }
-        if ($item.Server) { $Partes += $item.Server } elseif ($item.Nota) { $Partes += $item.Nota }
-        $Detalle = if ($Partes.Count) { $Partes -join ' | ' } else { '-' }
-        Write-Host ("  {0}://{1}:{2}  ->  HTTP {3}  [{4}]" -f $item.Esquema, $item.IP, $item.Puerto, $item.Codigo, $Detalle) -ForegroundColor White
-    }
+    Write-Listado $Encontradas "White"
+    Write-Host "==============================================" -ForegroundColor Cyan
+}
+
+# Apartado propio para los HTTP 500. Suelen ser dispositivos con la interfaz
+# web rota, o que rechazan la peticion generica que enviamos: hay algo ahi,
+# pero no se puede identificar con este escaneo.
+if ($Con500 -gt 0) {
+    Write-Host ""
+    Write-Host "CON ERROR HTTP 500 ($Con500):" -ForegroundColor Magenta
+    Write-Host "==============================================" -ForegroundColor Cyan
+    Write-Listado $Errores500 "Magenta"
     Write-Host "==============================================" -ForegroundColor Cyan
 }
 

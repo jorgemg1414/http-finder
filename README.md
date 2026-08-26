@@ -52,7 +52,7 @@ powershell -ExecutionPolicy Bypass -File .\httpFinder.ps1 -SegmentoIncompleto 19
 | `-TimeoutMilisegundos` | Tiempo de espera por objetivo (IP:puerto), en milisegundos. | `1000` |
 | `-MaxConcurrencia`     | Cuántos objetivos se prueban a la vez. Más = más rápido, más carga. | `50` |
 | `-MostrarErrores`      | Muestra también los puertos cerrados, timeouts y errores de red. | (oculto) |
-| `-Mostrar500`          | Incluye en los resultados las IPs que devuelven HTTP 500. | (omitido) |
+| `-Mostrar500`          | Muestra los HTTP 500 también según se encuentran. Al final salen siempre en su propio apartado. | (solo al final) |
 
 Ejemplo escaneando solo los puertos 80 y 8080, con timeout más corto y el doble
 de concurrencia:
