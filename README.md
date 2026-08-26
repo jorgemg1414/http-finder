@@ -95,3 +95,11 @@ Pasados ~5 minutos, la URL normal de `main` ya sirve la versión más reciente s
   lo lee mal y corrompe los acentos).
 - **No renombres el archivo a `.batch` ni `.bat`**: es un script de PowerShell, tiene
   que ejecutarse como `.ps1`.
+
+---
+
+## Licencia
+
+[MIT](LICENSE). Puedes usarlo, modificarlo y redistribuirlo libremente, incluso
+con fines comerciales, siempre que conserves el aviso de copyright. Se ofrece
+sin ninguna garantía.
