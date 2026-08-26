@@ -3,6 +3,9 @@
 # Escanea el rango .1 a .254 en varios puertos
 # OMITE RESPUESTAS HTTP 500 por defecto
 # SOLO MUESTRA EN PANTALLA - NO GENERA ARCHIVOS
+#
+# Creado por jorgemg1414
+# https://github.com/jorgemg1414/http-finder
 
 param(
     [Parameter(Mandatory=$true)]
@@ -20,6 +23,30 @@ param(
 
     [switch]$Mostrar500  # Switch para mostrar errores 500 si se desea
 )
+
+# ---------------------------------------------------------------------------
+# Identidad de la herramienta
+# ---------------------------------------------------------------------------
+$Version = '1.0.0'
+$Autor   = 'jorgemg1414'
+$Repo    = 'https://github.com/jorgemg1414/http-finder'
+
+# Here-string con comillas simples: el arte lleva backticks y barras invertidas,
+# que en una cadena normal PowerShell interpretaria como secuencias de escape.
+$Banner = @'
+ _   _   _             __ _         _
+| |_| |_| |_ _ __ ___ / _(_)_ _  __| |___ _ _
+| ' \  _|  _| '_ \___|  _| | ' \/ _` / -_) '_|
+|_||_\__|\__| .__/   |_| |_|_||_\__,_\___|_|
+            |_|
+'@
+
+Write-Host ""
+Write-Host $Banner -ForegroundColor Cyan
+Write-Host "  Escaner HTTP multipuerto para redes locales   v$Version" -ForegroundColor Cyan
+Write-Host "  Creado por $Autor" -ForegroundColor DarkCyan
+Write-Host "  $Repo" -ForegroundColor DarkGray
+Write-Host ""
 
 # Validar formato del segmento
 if ($SegmentoIncompleto -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}$') {
@@ -159,9 +186,7 @@ $ScanTarget = {
     }
 }
 
-Write-Host "====================================" -ForegroundColor Cyan
-Write-Host "ESCANER HTTP - MULTIPUERTO" -ForegroundColor Cyan
-Write-Host "====================================" -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "Segmento base: $SegmentoIncompleto.x" -ForegroundColor Yellow
 Write-Host "Rango: .1 a .254" -ForegroundColor Yellow
 Write-Host "Puertos: $($Puertos -join ', ')" -ForegroundColor Yellow
@@ -176,7 +201,7 @@ if ($MostrarErrores) {
     Write-Host "MOSTRANDO TIMEOUTS Y ERRORES DE CONEXION" -ForegroundColor Magenta
 }
 Write-Host "SOLO VISUALIZACION EN PANTALLA" -ForegroundColor Cyan
-Write-Host "====================================" -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Contadores
@@ -266,23 +291,23 @@ $TiempoTotal = $Stopwatch.Elapsed
 
 # Mostrar resumen
 Write-Host ""
-Write-Host "====================================" -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "RESUMEN DEL ESCANEO" -ForegroundColor Cyan
-Write-Host "====================================" -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "Objetivos probados (IP:puerto): $TareasTotales" -ForegroundColor White
 Write-Host "Respuestas validas: $ConRespuesta" -ForegroundColor Green
 $Etiqueta500 = if ($Mostrar500) { "mostrados" } else { "omitidos" }
 Write-Host "Error 500 ($Etiqueta500): $Con500" -ForegroundColor Magenta
 Write-Host "Sin respuesta (cerrados/timeout): $SinRespuesta" -ForegroundColor DarkGray
 Write-Host "Tiempo total: $($TiempoTotal.TotalSeconds) segundos" -ForegroundColor White
-Write-Host "====================================" -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host ""
 
 if ($ConRespuesta -eq 0) {
     Write-Host "No se encontraron dispositivos con respuesta HTTP valida (diferente de 500)." -ForegroundColor Yellow
 } else {
     Write-Host "DISPOSITIVOS ENCONTRADOS:" -ForegroundColor Green
-    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "==============================================" -ForegroundColor Cyan
     $Ordenadas = $Encontradas | Sort-Object @{Expression={[int](($_.IP -split '\.')[-1])}}, Puerto
     foreach ($item in $Ordenadas) {
         $Partes = @()
@@ -291,7 +316,7 @@ if ($ConRespuesta -eq 0) {
         $Detalle = if ($Partes.Count) { $Partes -join ' | ' } else { '-' }
         Write-Host ("  {0}://{1}:{2}  ->  HTTP {3}  [{4}]" -f $item.Esquema, $item.IP, $item.Puerto, $item.Codigo, $Detalle) -ForegroundColor White
     }
-    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "==============================================" -ForegroundColor Cyan
 }
 
 Write-Host ""
