@@ -133,7 +133,11 @@ Write-Host "Rango: .1 a .254" -ForegroundColor Yellow
 Write-Host "Puertos: $($Puertos -join ', ')" -ForegroundColor Yellow
 Write-Host "Timeout: $TimeoutMilisegundos ms" -ForegroundColor Yellow
 Write-Host "Concurrencia: $MaxConcurrencia objetivos a la vez" -ForegroundColor Yellow
-Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
+if ($Mostrar500) {
+    Write-Host "MOSTRANDO ERRORES HTTP 500" -ForegroundColor Magenta
+} else {
+    Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
+}
 Write-Host "SOLO VISUALIZACION EN PANTALLA" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
@@ -180,13 +184,11 @@ foreach ($Job in $Jobs) {
     $R = $Salida | Select-Object -First 1
     if ($null -eq $R) { continue }
 
-    # Omitir HTTP 500 salvo que se pida lo contrario
+    # HTTP 500 se omite salvo que se pida verlo con -Mostrar500.
+    # Si se pide, sigue el flujo normal: cuenta y aparece en el listado final.
     if ($R.Codigo -eq '500') {
         $Con500++
-        if ($Mostrar500) {
-            Write-Host "[500 OMITIDO] $($R.IP):$($R.Puerto) -> Error HTTP 500 (ignorado)" -ForegroundColor DarkGray
-        }
-        continue
+        if (-not $Mostrar500) { continue }
     }
 
     $ConRespuesta++
@@ -197,6 +199,7 @@ foreach ($Job in $Jobs) {
         "2*"     { $Color = "Green" }
         "3*"     { $Color = "Yellow" }
         "4*"     { $Color = "Red" }
+        "5*"     { $Color = "Magenta" }
         default  { $Color = "White" }
     }
 
@@ -221,7 +224,8 @@ Write-Host "RESUMEN DEL ESCANEO" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "Objetivos probados (IP:puerto): $TareasTotales" -ForegroundColor White
 Write-Host "Respuestas validas: $ConRespuesta" -ForegroundColor Green
-Write-Host "Error 500 (omitidos): $Con500" -ForegroundColor Magenta
+$Etiqueta500 = if ($Mostrar500) { "mostrados" } else { "omitidos" }
+Write-Host "Error 500 ($Etiqueta500): $Con500" -ForegroundColor Magenta
 Write-Host "Tiempo total: $($TiempoTotal.TotalSeconds) segundos" -ForegroundColor White
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
