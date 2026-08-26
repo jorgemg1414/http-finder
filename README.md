@@ -17,14 +17,14 @@ autofirmados que llevan casi todos estos cacharros.
 
 ## Descargar y ejecutar
 
-Abre **PowerShell** y descarga la última versión publicada:
+Abre **PowerShell** y descarga el script:
 
 ```powershell
-Invoke-WebRequest "https://github.com/jorgemg1414/http-finder/releases/latest/download/httpFinder.ps1" -OutFile "httpFinder.ps1"
+Invoke-WebRequest "https://raw.githubusercontent.com/jorgemg1414/http-finder/main/httpFinder.ps1" -OutFile "httpFinder.ps1"
 ```
 
-Esa URL apunta siempre a la release más reciente y sirve exactamente el fichero
-que se publicó, sin cachés de por medio.
+Esa URL sirve siempre el código más reciente. GitHub la cachea unos ~5 minutos,
+así que un cambio recién publicado puede tardar un poco en aparecer.
 
 Ejecútalo indicando los tres primeros octetos de tu red (ejemplo `192.168.1`):
 
@@ -67,17 +67,19 @@ de concurrencia:
 
 ---
 
-## Verificar la descarga
+## Versión fija y verificable
 
-Este script escanea tu red, así que conviene comprobar que te has bajado lo que
-esperabas y no algo manipulado por el camino. Calcula el hash del fichero:
+La descarga de arriba te da el código más reciente, que va cambiando. Si
+prefieres una versión concreta y poder comprobar que el fichero es el que dice
+ser, usa las [releases publicadas](https://github.com/jorgemg1414/http-finder/releases):
 
 ```powershell
+Invoke-WebRequest "https://github.com/jorgemg1414/http-finder/releases/latest/download/httpFinder.ps1" -OutFile "httpFinder.ps1"
 Get-FileHash .\httpFinder.ps1 -Algorithm SHA256
 ```
 
-Y compáralo con el **SHA256** que aparece publicado en la página de la release
-que te has descargado. Si no coinciden, no lo ejecutes.
+Cada release publica el **SHA256** de su fichero. Si el hash que te sale no
+coincide con el de la página de la release, no lo ejecutes.
 
 ---
 
