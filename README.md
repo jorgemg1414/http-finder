@@ -17,11 +17,14 @@ autofirmados que llevan casi todos estos cacharros.
 
 ## Descargar y ejecutar
 
-Abre **PowerShell** y descarga el script:
+Abre **PowerShell** y descarga la última versión publicada:
 
 ```powershell
-Invoke-WebRequest "https://raw.githubusercontent.com/jorgemg1414/http-finder/refs/heads/main/httpFinder.ps1" -OutFile "httpFinder.ps1"
+Invoke-WebRequest "https://github.com/jorgemg1414/http-finder/releases/latest/download/httpFinder.ps1" -OutFile "httpFinder.ps1"
 ```
+
+Esa URL apunta siempre a la release más reciente y sirve exactamente el fichero
+que se publicó, sin cachés de por medio.
 
 Ejecútalo indicando los tres primeros octetos de tu red (ejemplo `192.168.1`):
 
@@ -64,26 +67,17 @@ de concurrencia:
 
 ---
 
-## Nota sobre el caché de GitHub
+## Verificar la descarga
 
-La URL `raw.githubusercontent.com/.../main/...` se guarda en un **caché** unos
-~5 minutos. Si acabas de actualizar el script y necesitas la última versión
-**enseguida**, tienes dos opciones:
-
-**1. Añadir un parámetro a la URL para saltarte el caché:**
+Este script escanea tu red, así que conviene comprobar que te has bajado lo que
+esperabas y no algo manipulado por el camino. Calcula el hash del fichero:
 
 ```powershell
-Invoke-WebRequest "https://raw.githubusercontent.com/jorgemg1414/http-finder/refs/heads/main/httpFinder.ps1?x=$(Get-Random)" -OutFile "httpFinder.ps1"
+Get-FileHash .\httpFinder.ps1 -Algorithm SHA256
 ```
 
-**2. Descargar por número de commit** (esas URLs nunca se cachean; reemplaza
-`COMMIT` por el hash que quieras):
-
-```powershell
-Invoke-WebRequest "https://raw.githubusercontent.com/jorgemg1414/http-finder/COMMIT/httpFinder.ps1" -OutFile "httpFinder.ps1"
-```
-
-Pasados ~5 minutos, la URL normal de `main` ya sirve la versión más reciente sin trucos.
+Y compáralo con el **SHA256** que aparece publicado en la página de la release
+que te has descargado. Si no coinciden, no lo ejecutes.
 
 ---
 
