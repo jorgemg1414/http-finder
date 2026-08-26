@@ -21,7 +21,9 @@ param(
 
     [switch]$MostrarErrores,
 
-    [switch]$Mostrar500  # Switch para mostrar errores 500 si se desea
+    # Los 500 salen siempre en su apartado al final; esto los muestra
+    # ademas segun se van encontrando durante el escaneo.
+    [switch]$Mostrar500
 )
 
 # ---------------------------------------------------------------------------
