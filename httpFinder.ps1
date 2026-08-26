@@ -35,23 +35,26 @@ if ($SegmentoIncompleto -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}$') {
 $ScanTarget = {
     param($IP, $Puerto, $TimeoutMs)
 
+    # Puertos TLS conocidos -> se envolvera la conexion en SSL/TLS
+    $UsarTls = ($Puerto -eq 443 -or $Puerto -eq 8443)
+    $Esquema = if ($UsarTls) { 'https' } else { 'http' }
+
     $Tcp = New-Object System.Net.Sockets.TcpClient
     try {
         # Conexion TCP con timeout
         $Async = $Tcp.BeginConnect($IP, $Puerto, $null, $null)
         if (-not $Async.AsyncWaitHandle.WaitOne($TimeoutMs, $false)) {
             $Tcp.Close()
-            return $null   # timeout, puerto cerrado
+            return [PSCustomObject]@{
+                IP = $IP; Puerto = $Puerto; Esquema = $Esquema
+                Codigo = 'ERROR'; Server = ''; Titulo = ''; Nota = 'Sin respuesta (timeout)'
+            }
         }
         $Tcp.EndConnect($Async)
 
         $NetStream = $Tcp.GetStream()
         $NetStream.ReadTimeout = $TimeoutMs
         $NetStream.WriteTimeout = $TimeoutMs
-
-        # Puertos TLS conocidos -> envolver la conexion en SSL/TLS
-        $UsarTls = ($Puerto -eq 443 -or $Puerto -eq 8443)
-        $Esquema = if ($UsarTls) { 'https' } else { 'http' }
 
         if ($UsarTls) {
             # Aceptar certificados autofirmados (comunes en routers/camaras/DVR)
@@ -143,7 +146,16 @@ $ScanTarget = {
         }
     } catch {
         try { $Tcp.Close() } catch { }
-        return $null
+        # PowerShell envuelve las excepciones de .NET, el motivo real esta dentro
+        $Motivo = if ($_.Exception.InnerException) {
+            $_.Exception.InnerException.Message
+        } else {
+            $_.Exception.Message
+        }
+        return [PSCustomObject]@{
+            IP = $IP; Puerto = $Puerto; Esquema = $Esquema
+            Codigo = 'ERROR'; Server = ''; Titulo = ''; Nota = ($Motivo -replace '\s+', ' ').Trim()
+        }
     }
 }
 
@@ -160,6 +172,9 @@ if ($Mostrar500) {
 } else {
     Write-Host "OMITIENDO ERRORES HTTP 500" -ForegroundColor Magenta
 }
+if ($MostrarErrores) {
+    Write-Host "MOSTRANDO TIMEOUTS Y ERRORES DE CONEXION" -ForegroundColor Magenta
+}
 Write-Host "SOLO VISUALIZACION EN PANTALLA" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
@@ -167,6 +182,7 @@ Write-Host ""
 # Contadores
 $ConRespuesta = 0
 $Con500 = 0
+$SinRespuesta = 0
 
 # Lista de resultados encontrados para mostrar al final
 $Encontradas = @()
@@ -205,6 +221,15 @@ foreach ($Job in $Jobs) {
 
     $R = $Salida | Select-Object -First 1
     if ($null -eq $R) { continue }
+
+    # Puerto cerrado, filtrado o error de red: solo interesa con -MostrarErrores
+    if ($R.Codigo -eq 'ERROR') {
+        $SinRespuesta++
+        if ($MostrarErrores) {
+            Write-Host "[--] $($R.IP):$($R.Puerto) -> $($R.Nota)" -ForegroundColor DarkGray
+        }
+        continue
+    }
 
     # HTTP 500 se omite salvo que se pida verlo con -Mostrar500.
     # Si se pide, sigue el flujo normal: cuenta y aparece en el listado final.
@@ -248,6 +273,7 @@ Write-Host "Objetivos probados (IP:puerto): $TareasTotales" -ForegroundColor Whi
 Write-Host "Respuestas validas: $ConRespuesta" -ForegroundColor Green
 $Etiqueta500 = if ($Mostrar500) { "mostrados" } else { "omitidos" }
 Write-Host "Error 500 ($Etiqueta500): $Con500" -ForegroundColor Magenta
+Write-Host "Sin respuesta (cerrados/timeout): $SinRespuesta" -ForegroundColor DarkGray
 Write-Host "Tiempo total: $($TiempoTotal.TotalSeconds) segundos" -ForegroundColor White
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
